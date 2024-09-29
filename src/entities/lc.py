@@ -64,15 +64,15 @@ class Loop_closure(object):
         self.proj_matrix = getProjectionMatrix2(
                 znear=0.01,
                 zfar=100.0,
-                fx = self.config["cam"]["fx"],
-                fy = self.config["cam"]["fx"],
-                cx = self.config["cam"]["cx"],
-                cy = self.config["cam"]["cy"],
-                W = self.config["cam"]["W"],
-                H = self.config["cam"]["H"],
+                fx = self.dataset.fx,
+                fy = self.dataset.fy,
+                cx = self.dataset.cx,
+                cy = self.dataset.cy,
+                W = self.dataset.width,
+                H = self.dataset.height,
             ).T
-        self.fovx = focal2fov(self.config["cam"]["fx"], self.config["cam"]["W"])
-        self.fovy = focal2fov(self.config["cam"]["fy"], self.config["cam"]["H"])
+        self.fovx = focal2fov(self.dataset.fx, self.dataset.width)
+        self.fovy = focal2fov(self.dataset.fy, self.dataset.height)
         self.min_interval = self.config['lc']['min_interval']
         
         # TODO: rename below

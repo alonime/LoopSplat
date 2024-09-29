@@ -86,6 +86,7 @@ class Tracker(object):
         tracking_mask = torch.ones_like(alpha_mask).bool()
         tracking_mask &= depth_mask
         depth_err = torch.abs(rendered_depth - gt_depth) * depth_mask
+        depth_err[depth_err.isnan()] = 0
 
         if self.filter_alpha:
             tracking_mask &= alpha_mask
@@ -127,12 +128,13 @@ class Tracker(object):
             self.odometer.update_last_rgbd(last_image, last_depth)
 
         if self.odometry_type == "gt":
-            return gt_c2w
+            return gt_c2w.numpy(), None
         elif self.odometry_type == "const_speed":
             init_c2w = extrapolate_poses(prev_c2ws[1:])
         elif self.odometry_type == "odometer":
-            odometer_rel = self.odometer.estimate_rel_pose(image, depth)
-            init_c2w = prev_c2ws[-1] @ odometer_rel
+            # odometer_rel = self.odometer.estimate_rel_pose(image, depth)
+            # init_c2w = prev_c2ws[-1] @ odometer_rel
+            init_c2w = gt_c2w
         elif self.odometry_type == "previous":
             init_c2w = prev_c2ws[-1]
 
@@ -153,13 +155,15 @@ class Tracker(object):
 
         gt_color = self.transform(image).cuda()
         gt_depth = np2torch(depth, "cuda")
-        depth_mask = gt_depth > 0.0
-        gt_trans = np2torch(gt_c2w[:3, 3])
+        depth_mask = (gt_depth > 0.0) & (~torch.isnan(gt_depth))
+        # gt_trans = np2torch(gt_c2w[:3, 3])
+        gt_trans = gt_c2w[:3, 3]
+
         gt_quat = np2torch(R.from_matrix(gt_c2w[:3, :3]).as_quat(canonical=True)[[3, 0, 1, 2]])
         num_iters = self.config["iterations"]
         current_min_loss = float("inf")
 
-        print(f"\nTracking frame {frame_id}")
+        print(f"\nTracking frame {frame_id} / {self.dataset.n_img}")
         # Initial loss check
         color_loss, depth_loss, _, _, _ = self.compute_losses(gaussian_model, render_settings, opt_cam_rot,
                                                               opt_cam_trans, gt_color, gt_depth, depth_mask, 

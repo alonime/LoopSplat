@@ -8,6 +8,8 @@ import torch
 import json
 import imageio
 import trimesh
+from natsort import natsorted
+from omegaconf import OmegaConf
 
 
 class BaseDataset(torch.utils.data.Dataset):
@@ -257,6 +259,62 @@ class ScanNetPP(BaseDataset):
         depth_data = cv2.resize(depth_data.astype(float), (self.width, self.height), interpolation=cv2.INTER_NEAREST)
         depth_data = depth_data.astype(np.float32) / self.depth_scale
         return index, color_data, depth_data, self.poses[index]
+    
+
+class SVO(BaseDataset):
+    def __init__(self, dataset_config: dict):
+        self.transforms = OmegaConf.load(Path(dataset_config["input_path"])/ "transforms.json")
+
+        dataset_config["H"]  = self.transforms["h"]
+        dataset_config["W"]  = self.transforms["w"]
+        dataset_config["fx"] = self.transforms["fl_x"]
+        dataset_config["fy"] = self.transforms["fl_y"]
+        dataset_config["cx"] = self.transforms["cx"]
+        dataset_config["cy"] = self.transforms["cy"]
+
+        super().__init__(dataset_config)
+        self.color_paths = natsorted((self.dataset_path / "images").glob("*.png"))
+        self.depth_paths = natsorted((self.dataset_path / "depth").glob("*.npy"))
+        self.n_img = len(self.color_paths)
+        self.load_poses()
+
+
+    def load_poses(self,):
+        self.poses = []
+        poses_sort = [(frame['file_path'], frame['transform_matrix']) for frame in self.transforms['frames']]
+        poses_sort.sort(key=lambda x: x[0])
+
+
+        poses_data = np.array([frame[1] for frame in poses_sort])
+
+        P = torch.tensor([[1, 0, 0, 0],
+                          [0, 1, 0, 0],
+                          [0, 0, 1, 0],
+                          [0, 0, 0, 1]]).double()
+        
+        for pose in poses_data:
+            _pose = P @ pose @ P.T
+            self.poses.append(_pose)
+
+
+    def __getitem__(self, index):
+        color_data = cv2.imread(str(self.color_paths[index]))
+        if self.distortion is not None:
+            color_data = cv2.undistort(
+                color_data, self.intrinsics, self.distortion)
+        color_data = cv2.cvtColor(color_data, cv2.COLOR_BGR2RGB)
+        color_data = cv2.resize(color_data, (self.dataset_config["W"], self.dataset_config["H"]))
+
+        depth_data = np.load(str(self.depth_paths[index]))
+        depth_data = depth_data.astype(np.float32) / self.depth_scale
+        depth_data[depth_data < 0] = np.nan
+        edge = self.crop_edge
+        if edge > 0:
+            color_data = color_data[edge:-edge, edge:-edge]
+            depth_data = depth_data[edge:-edge, edge:-edge]
+        # Interpolate depth values for splatting
+        return index, color_data, depth_data, self.poses[index]
+
 
 
 def get_dataset(dataset_name: str):
@@ -268,4 +326,6 @@ def get_dataset(dataset_name: str):
         return ScanNet
     elif dataset_name == "scannetpp":
         return ScanNetPP
+    elif dataset_name == "svo":
+        return SVO
     raise NotImplementedError(f"Dataset {dataset_name} not implemented")

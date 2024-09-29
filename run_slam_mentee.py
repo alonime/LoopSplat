@@ -90,8 +90,8 @@ if __name__ == "__main__":
     config = load_config(args.config_path)
     config = update_config_with_args(config, args)
 
-    if os.getenv('DISABLE_WANDB') == 'true':
-        config["use_wandb"] = False
+    config["use_wandb"] = False
+    
     if config["use_wandb"]:
         wandb.init(
             project=config["project_name"],

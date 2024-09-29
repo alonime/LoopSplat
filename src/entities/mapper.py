@@ -139,7 +139,7 @@ class Mapper(object):
             gt_image = keyframe["color"]
             gt_depth = keyframe["depth"]
 
-            mask = (gt_depth > 0) & (~torch.isnan(depth)).squeeze(0)
+            mask = (gt_depth > 0) & (~torch.isnan(gt_depth)) & (~torch.isnan(depth)).squeeze(0)
             color_loss = (1.0 - self.opt.lambda_dssim) * l1_loss(
                 image[:, mask], gt_image[:, mask]) + self.opt.lambda_dssim * (1.0 - ssim(image, gt_image))
 
@@ -257,7 +257,8 @@ class Mapper(object):
                 depth_vis.clone().detach().permute(1, 2, 0),
                 keyframe["color"].permute(1, 2, 0),
                 keyframe["depth"].unsqueeze(-1),
-                seeding_mask=seeding_mask)
+                seeding_mask=seeding_mask,
+                interval=3)
 
         # Log the mapping numbers for the current frame
         self.logger.log_mapping_iteration(frame_id, new_pts_num, gaussian_model.get_size(),

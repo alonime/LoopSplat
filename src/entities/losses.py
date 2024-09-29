@@ -17,6 +17,7 @@ def l1_loss(network_output: torch.Tensor, gt: torch.Tensor, agg="mean") -> torch
         The computed L1 loss.
     """
     l1_loss = torch.abs(network_output - gt)
+    l1_loss[l1_loss.isnan()] = 0
     if agg == "mean":
         return l1_loss.mean()
     elif agg == "sum":

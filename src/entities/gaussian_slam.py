@@ -41,7 +41,8 @@ class GaussianSLAM(object):
         self.mapping_frame_ids = frame_ids[::config["mapping"]["map_every"]] + [n_frames - 1]
 
         self.estimated_c2ws = torch.empty(len(self.dataset), 4, 4)
-        self.estimated_c2ws[0] = torch.from_numpy(self.dataset[0][3])
+        # self.estimated_c2ws[0] = torch.from_numpy(self.dataset[0][3])
+        self.estimated_c2ws[0] = self.dataset[0][3]
         self.exposures_ab = torch.zeros(len(self.dataset), 2)
 
         save_dict_to_yaml(config, "config.yaml", directory=self.output_path)
@@ -216,7 +217,7 @@ class GaussianSLAM(object):
         for frame_id in range(len(self.dataset)):
 
             if frame_id in [0, 1]:
-                estimated_c2w = self.dataset[frame_id][-1]
+                estimated_c2w = self.dataset[frame_id][-1].numpy() #pose
                 exposure_ab = torch.nn.Parameter(torch.tensor(
                     0.0, device="cuda")), torch.nn.Parameter(torch.tensor(0.0, device="cuda"))
             else:
@@ -224,12 +225,13 @@ class GaussianSLAM(object):
                     frame_id, gaussian_model,
                     torch2np(self.estimated_c2ws[torch.tensor([0, frame_id - 2, frame_id - 1])]))
             exposure_ab = exposure_ab if self.enable_exposure else None
-            self.estimated_c2ws[frame_id] = np2torch(estimated_c2w)
+            # self.estimated_c2ws[frame_id] = np2torch(estimated_c2w)
+            self.estimated_c2ws[frame_id] =  torch.from_numpy(estimated_c2w)
+
 
             # Reinitialize gaussian model for new segment
             if self.should_start_new_submap(frame_id):
-                # first save current submap and its keyframe info
-                self.save_current_submap(gaussian_model)
+                # first save current submap and its keyframe info                self.save_current_submap(gaussian_model)
                 
                 # update submap infomation for loop closer
                 self.loop_closer.update_submaps_info(self.keyframes_info)
