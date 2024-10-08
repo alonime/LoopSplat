@@ -91,7 +91,7 @@ class Loop_closure(object):
         with torch.no_grad():
             kf_ids, submap_desc = [], []
             for key in keyframes_info.keys():
-                submap_desc.append(self.netvlad(np2torch(self.dataset[key][1], self.device).permute(2, 0, 1)[None]/255.0))
+                submap_desc.append(self.netvlad(np2torch(self.dataset[key][1], self.device).permute(2, 0, 1)[None] / 255.0))
             submap_desc = torch.cat(submap_desc)
             self_sim = torch.einsum("id,jd->ij", submap_desc, submap_desc)
             score_min, _ = self_sim.topk(max(int(len(submap_desc) * self.config["lc"]["min_similarity"]), 1))
@@ -117,24 +117,25 @@ class Loop_closure(object):
         for kf_id in submap_dict['submap_keyframes']:
             _, rgb, depth, c2w_gt = self.dataset[kf_id]
             c2w_est = self.c2ws_est[kf_id]
-            T_gt = torch.from_numpy(c2w_gt).to(self.device).inverse()
+            T_gt = c2w_gt.to(self.device).inverse()
             T_est = torch.linalg.inv(c2w_est).to(self.device)
             cam_i = Camera(kf_id, None, None,
                    T_gt, 
                    self.proj_matrix, 
-                   self.config["cam"]["fx"],
-                   self.config["cam"]["fx"],
-                   self.config["cam"]["cx"],
-                   self.config["cam"]["cy"],
+                   self.dataset.fx,
+                   self.dataset.fy,
+                   self.dataset.cx,
+                   self.dataset.cy,
                    self.fovx, 
                    self.fovy, 
-                   self.config["cam"]["H"], 
-                   self.config["cam"]["W"])
+                   self.dataset.height, 
+                   self.dataset.width)
             cam_i.R = T_est[:3, :3]
             cam_i.T = T_est[:3, 3]
             rgb_path = self.dataset.color_paths[kf_id]
             depth_path = self.dataset.depth_paths[kf_id]
-            depth = np.array(Image.open(depth_path)) / self.config['cam']['depth_scale']
+            depth = np.load(depth_path) / self.config['cam']['depth_scale']
+            depth[depth < 0] = np.nan
             cam_i.depth = depth
             cam_i.rgb_path = rgb_path
             cam_i.depth_path = depth_path
@@ -275,7 +276,7 @@ class Loop_closure(object):
         self.submap_paths = sorted(glob.glob(str(self.submap_path/"*.ckpt")), key=lambda x: int(x.split('/')[-1][:-5]))
         
         
-        if self.submap_id<3 or len(self.detect_closure(self.submap_id)) == 0:
+        if self.submap_id < 1 or len(self.detect_closure(self.submap_id)) == 0:
             print(f"\nNo loop closure detected at submap no.{self.submap_id}")
             return correction_list
         

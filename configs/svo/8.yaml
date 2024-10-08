@@ -1,0 +1,9 @@
+inherit_from: /home/liora/Lior/LoopSplat/configs/svo/svo.yaml
+data:
+  input_path: /home/liora/Lior/Datasets/svo/global/records/global_8_skip_8
+  output_path: output/svo/global_1_skip_8/
+  scene_name: 1
+cam: 
+  depth_scale: 1000.
+  crop_edge: 12
+

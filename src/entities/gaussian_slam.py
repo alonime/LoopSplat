@@ -23,6 +23,9 @@ from src.utils.mapper_utils import exceeds_motion_thresholds
 from src.utils.utils import np2torch, setup_seed, torch2np
 from src.utils.vis_utils import *  # noqa - needed for debugging
 
+from src.mentee.optional_rerun_wrapper import OptionalReRun
+
+
 
 class GaussianSLAM(object):
 
@@ -71,6 +74,9 @@ class GaussianSLAM(object):
         pprint.PrettyPrinter().pprint(config["mapping"])
         print('Loop closure config')
         pprint.PrettyPrinter().pprint(config["lc"])
+
+        self.viz = OptionalReRun()
+
         
 
     def _setup_output_path(self, config: dict) -> None:
@@ -215,6 +221,7 @@ class GaussianSLAM(object):
         self.submap_id = 0
 
         for frame_id in range(len(self.dataset)):
+            self.viz.set_time_sequence("frame", frame_id)
 
             if frame_id in [0, 1]:
                 estimated_c2w = self.dataset[frame_id][-1].numpy() #pose
@@ -231,8 +238,8 @@ class GaussianSLAM(object):
 
             # Reinitialize gaussian model for new segment
             if self.should_start_new_submap(frame_id):
-                # first save current submap and its keyframe info                self.save_current_submap(gaussian_model)
-                
+                # first save current submap and its keyframe info                
+                self.save_current_submap(gaussian_model)
                 # update submap infomation for loop closer
                 self.loop_closer.update_submaps_info(self.keyframes_info)
                 

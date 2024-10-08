@@ -272,6 +272,8 @@ class SVO(BaseDataset):
         dataset_config["cx"] = self.transforms["cx"]
         dataset_config["cy"] = self.transforms["cy"]
 
+        self.clip_depth_dist = dataset_config['cam']['clip_depth_dist']
+
         super().__init__(dataset_config)
         self.color_paths = natsorted((self.dataset_path / "images").glob("*.png"))
         self.depth_paths = natsorted((self.dataset_path / "depth").glob("*.npy"))
@@ -294,7 +296,7 @@ class SVO(BaseDataset):
         
         for pose in poses_data:
             _pose = P @ pose @ P.T
-            self.poses.append(_pose)
+            self.poses.append(torch.linalg.inv(_pose))
 
 
     def __getitem__(self, index):
@@ -308,6 +310,9 @@ class SVO(BaseDataset):
         depth_data = np.load(str(self.depth_paths[index]))
         depth_data = depth_data.astype(np.float32) / self.depth_scale
         depth_data[depth_data < 0] = np.nan
+        if self.clip_depth_dist > 0:
+            depth_data[depth_data > self.clip_depth_dist] = np.nan
+        
         edge = self.crop_edge
         if edge > 0:
             color_data = color_data[edge:-edge, edge:-edge]

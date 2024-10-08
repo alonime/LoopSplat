@@ -1,0 +1,7 @@
+inherit_from: /home/liora/Lior/LoopSplat/configs/svo/svo.yaml
+data:
+  input_path: /home/liora/Lior/Datasets/svo/workshop_new
+  output_path: output/svo/workshop_new/
+  scene_name: 1
+cam: 
+  depth_scale: 1000.

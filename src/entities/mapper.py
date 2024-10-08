@@ -7,7 +7,7 @@ import torch
 import torchvision
 
 from src.entities.arguments import OptimizationParams
-from src.entities.datasets import TUM_RGBD, BaseDataset, ScanNet
+from src.entities.datasets import TUM_RGBD, BaseDataset, ScanNet, SVO
 from src.entities.gaussian_model import GaussianModel
 from src.entities.logger import Logger
 from src.entities.losses import isotropic_loss, l1_loss, ssim
@@ -20,6 +20,12 @@ from src.utils.mapper_utils import (calc_psnr, compute_camera_frustum_corners,
 from src.utils.utils import (get_render_settings, np2ptcloud, np2torch,
                              render_gaussian_model, torch2np)
 from src.utils.vis_utils import *  # noqa - needed for debugging
+from src.utils.gaussian_model_utils import SH2RGB
+
+from src.mentee.optional_rerun_wrapper import OptionalReRun
+
+import open3d as o3d
+
 
 
 class Mapper(object):
@@ -44,6 +50,7 @@ class Mapper(object):
         self.current_view_opt_iterations = config["current_view_opt_iterations"]
         self.opt = OptimizationParams(ArgumentParser(description="Training script parameters"))
         self.keyframes = []
+        self.viz = OptionalReRun()
 
     def compute_seeding_mask(self, gaussian_model: GaussianModel, keyframe: dict, new_submap: bool) -> np.ndarray:
         """
@@ -228,7 +235,7 @@ class Mapper(object):
         pts = self.seed_new_gaussians(
             gt_color, gt_depth, self.dataset.intrinsics, estimate_c2w, seeding_mask, is_new_submap)
 
-        filter_cloud = isinstance(self.dataset, (TUM_RGBD, ScanNet)) and not is_new_submap
+        filter_cloud = isinstance(self.dataset, (TUM_RGBD, ScanNet, SVO)) and not is_new_submap # TODO filter for svo
 
         new_pts_num = self.grow_submap(gt_depth, estimate_c2w, gaussian_model, pts, filter_cloud)
 
@@ -263,4 +270,10 @@ class Mapper(object):
         # Log the mapping numbers for the current frame
         self.logger.log_mapping_iteration(frame_id, new_pts_num, gaussian_model.get_size(),
                                           optimization_time/max_iterations, opt_dict)
+        
+        xyz = gaussian_model.get_xyz().detach().cpu().numpy()
+        colors = torch.clamp(SH2RGB(gaussian_model.get_features().detach().cpu().squeeze()), min=0.0, max=1.0).numpy()
+        self.viz.log('sub_map_pcd', self.viz.Points3D(xyz, colors= (colors * 255).astype(np.int32)))
+
+        
         return opt_dict
